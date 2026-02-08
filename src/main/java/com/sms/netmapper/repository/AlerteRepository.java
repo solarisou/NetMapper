@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+
 import com.sms.netmapper.model.Alerte;
 import com.sms.netmapper.model.Equipement;
 
@@ -18,6 +19,12 @@ public interface AlerteRepository extends JpaRepository<Alerte, Integer> {
     List<Alerte> findByEquipement(Equipement equipement);
     
     /**
+     * Trouver toutes les alertes par ID d'équipement
+     * AJOUTÉ : Méthode utilisée dans AlerteService
+     */
+    List<Alerte> findByEquipementIdEquipement(Integer idEquipement);
+    
+    /**
      * Trouver toutes les alertes par niveau
      */
     List<Alerte> findByNiveau(String niveau);
@@ -26,6 +33,12 @@ public interface AlerteRepository extends JpaRepository<Alerte, Integer> {
      * Trouver les alertes après une certaine date
      */
     List<Alerte> findByDateAlerteAfter(LocalDateTime date);
+    
+    /**
+     * Trouver les alertes par niveau ET après une date
+     * AJOUTÉ : Méthode utilisée dans AlerteService.getAlertesCritiques()
+     */
+    List<Alerte> findByNiveauAndDateAlerteAfter(String niveau, LocalDateTime date);
     
     /**
      * Trouver les alertes critiques récentes (7 derniers jours)
