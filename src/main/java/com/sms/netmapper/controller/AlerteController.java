@@ -1,6 +1,5 @@
 package com.sms.netmapper.controller;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,15 +18,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sms.netmapper.model.Alerte;
-import com.sms.netmapper.repository.AlerteRepository;
-import com.sms.netmapper.repository.EquipementRepository;
+import com.sms.netmapper.service.AlerteService;
 
 import jakarta.validation.Valid;
 
 /**
  * Controller REST pour la gestion des alertes système
+ * REFACTORISÉ : Utilise AlerteService au lieu de AlerteRepository
  * 
- * @author SMS Informatique
+ * @author SMS Informatique - NetMapper
  */
 @RestController
 @RequestMapping("/alertes")
@@ -35,10 +34,7 @@ import jakarta.validation.Valid;
 public class AlerteController {
 
     @Autowired
-    private AlerteRepository alerteRepository;
-
-    @Autowired
-    private EquipementRepository equipementRepository;
+    private AlerteService alerteService;
 
     /**
      * GET /api/alertes
@@ -46,7 +42,7 @@ public class AlerteController {
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllAlertes() {
-        List<Alerte> alertes = alerteRepository.findAll();
+        List<Alerte> alertes = alerteService.getAllAlertes();
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -62,7 +58,7 @@ public class AlerteController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getAlerteById(@PathVariable Integer id) {
-        return alerteRepository.findById(id)
+        return alerteService.getAlerteById(id)
             .map(alerte -> {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
@@ -83,10 +79,7 @@ public class AlerteController {
      */
     @GetMapping("/actives")
     public ResponseEntity<Map<String, Object>> getAlertesActives() {
-        LocalDateTime depuis24h = LocalDateTime.now().minusHours(24);
-        List<Alerte> alertes = alerteRepository.findAll().stream()
-            .filter(a -> a.getDateAlerte().isAfter(depuis24h))
-            .toList();
+        List<Alerte> alertes = alerteService.getAlertesActives();
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -102,7 +95,7 @@ public class AlerteController {
      */
     @GetMapping("/niveau/{niveau}")
     public ResponseEntity<Map<String, Object>> getAlertesByNiveau(@PathVariable String niveau) {
-        List<Alerte> alertes = alerteRepository.findByNiveau(niveau);
+        List<Alerte> alertes = alerteService.getByNiveau(niveau);
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -119,8 +112,7 @@ public class AlerteController {
      */
     @GetMapping("/critiques")
     public ResponseEntity<Map<String, Object>> getAlertesCritiques() {
-        LocalDateTime depuis24h = LocalDateTime.now().minusHours(24);
-        List<Alerte> alertes = alerteRepository.findRecentCriticalAlertes(depuis24h);
+        List<Alerte> alertes = alerteService.getAlertesCritiques();
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -136,24 +128,14 @@ public class AlerteController {
      */
     @GetMapping("/equipement/{idEquipement}")
     public ResponseEntity<Map<String, Object>> getAlertesByEquipement(@PathVariable Integer idEquipement) {
-        return equipementRepository.findById(idEquipement)
-            .map(equipement -> {
-                List<Alerte> alertes = equipement.getAlertes();
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("equipement", equipement.getNom());
-                response.put("total", alertes.size());
-                response.put("data", alertes);
-                
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Équipement non trouvé avec l'ID: " + idEquipement);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
+        List<Alerte> alertes = alerteService.getByEquipement(idEquipement);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("total", alertes.size());
+        response.put("data", alertes);
+        
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -162,22 +144,7 @@ public class AlerteController {
      */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
-        long total = alerteRepository.count();
-        long critiques = alerteRepository.findByNiveau("Critique").size();
-        long avertissements = alerteRepository.findByNiveau("Avertissement").size();
-        long infos = alerteRepository.findByNiveau("Info").size();
-        
-        LocalDateTime depuis24h = LocalDateTime.now().minusHours(24);
-        long actives = alerteRepository.findAll().stream()
-            .filter(a -> a.getDateAlerte().isAfter(depuis24h))
-            .count();
-        
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("total", total);
-        stats.put("actives_24h", actives);
-        stats.put("critiques", critiques);
-        stats.put("avertissements", avertissements);
-        stats.put("infos", infos);
+        Map<String, Object> stats = alerteService.getStatistiques();
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -189,17 +156,25 @@ public class AlerteController {
     /**
      * POST /api/alertes
      * Crée une nouvelle alerte
+     * La validation métier est gérée par le Service
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> createAlerte(@Valid @RequestBody Alerte alerte) {
-        Alerte savedAlerte = alerteRepository.save(alerte);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Alerte créée avec succès");
-        response.put("data", savedAlerte);
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        try {
+            Alerte savedAlerte = alerteService.createAlerte(alerte);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Alerte créée avec succès");
+            response.put("data", savedAlerte);
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
     }
 
     /**
@@ -211,28 +186,21 @@ public class AlerteController {
             @PathVariable Integer id,
             @Valid @RequestBody Alerte alerteDetails) {
         
-        return alerteRepository.findById(id)
-            .map(alerte -> {
-                alerte.setNiveau(alerteDetails.getNiveau());
-                alerte.setMessage(alerteDetails.getMessage());
-                alerte.setType(alerteDetails.getType());
-                alerte.setEquipement(alerteDetails.getEquipement());
-                
-                Alerte updatedAlerte = alerteRepository.save(alerte);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "Alerte mise à jour avec succès");
-                response.put("data", updatedAlerte);
-                
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Alerte non trouvée avec l'ID: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
+        try {
+            Alerte updatedAlerte = alerteService.updateAlerte(id, alerteDetails);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Alerte mise à jour avec succès");
+            response.put("data", updatedAlerte);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
     }
 
     /**
@@ -241,21 +209,19 @@ public class AlerteController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteAlerte(@PathVariable Integer id) {
-        return alerteRepository.findById(id)
-            .map(alerte -> {
-                alerteRepository.delete(alerte);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "Alerte supprimée avec succès");
-                
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Alerte non trouvée avec l'ID: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
+        try {
+            alerteService.deleteAlerte(id);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Alerte supprimée avec succès");
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
     }
 }

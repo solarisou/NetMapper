@@ -20,14 +20,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sms.netmapper.model.Equipement;
-import com.sms.netmapper.repository.EquipementRepository;
+import com.sms.netmapper.service.EquipementService;
 
 import jakarta.validation.Valid;
 
 /**
  * Controller REST pour la gestion des équipements réseau
+ * REFACTORISÉ : Utilise EquipementService au lieu de EquipementRepository
  * 
- * @author SMS Informatique
+ * @author SMS Informatique - NetMapper
  */
 @RestController
 @RequestMapping("/equipements")
@@ -35,7 +36,7 @@ import jakarta.validation.Valid;
 public class EquipementController {
 
     @Autowired
-    private EquipementRepository equipementRepository;
+    private EquipementService equipementService;
 
     /**
      * GET /api/equipements
@@ -43,7 +44,7 @@ public class EquipementController {
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllEquipements() {
-        List<Equipement> equipements = equipementRepository.findAll();
+        List<Equipement> equipements = equipementService.getAllEquipements();
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -59,7 +60,7 @@ public class EquipementController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getEquipementById(@PathVariable Integer id) {
-        return equipementRepository.findById(id)
+        return equipementService.getEquipementById(id)
             .map(equipement -> {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
@@ -80,7 +81,7 @@ public class EquipementController {
      */
     @GetMapping("/type/{type}")
     public ResponseEntity<Map<String, Object>> getEquipementsByType(@PathVariable String type) {
-        List<Equipement> equipements = equipementRepository.findByType(type);
+        List<Equipement> equipements = equipementService.getByType(type);
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -97,7 +98,7 @@ public class EquipementController {
      */
     @GetMapping("/etat/{etat}")
     public ResponseEntity<Map<String, Object>> getEquipementsByEtat(@PathVariable String etat) {
-        List<Equipement> equipements = equipementRepository.findByEtat(etat);
+        List<Equipement> equipements = equipementService.getByEtat(etat);
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -114,27 +115,7 @@ public class EquipementController {
      */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
-        long total = equipementRepository.count();
-        long actifs = equipementRepository.findByEtat("Actif").size();
-        long inactifs = equipementRepository.findByEtat("Inactif").size();
-        long maintenance = equipementRepository.findByEtat("En maintenance").size();
-        long horsService = equipementRepository.findByEtat("Hors service").size();
-        
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("total", total);
-        stats.put("actifs", actifs);
-        stats.put("inactifs", inactifs);
-        stats.put("en_maintenance", maintenance);
-        stats.put("hors_service", horsService);
-        
-        // Statistiques par type
-        Map<String, Long> parType = new HashMap<>();
-        parType.put("serveurs", (long) equipementRepository.findByType("Serveur").size());
-        parType.put("switches", (long) equipementRepository.findByType("Switch").size());
-        parType.put("routeurs", (long) equipementRepository.findByType("Routeur").size());
-        parType.put("points_acces", (long) equipementRepository.findByType("Point d'accès").size());
-        parType.put("postes_travail", (long) equipementRepository.findByType("Poste de travail").size());
-        stats.put("par_type", parType);
+        Map<String, Object> stats = equipementService.getStatistiques();
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -144,27 +125,48 @@ public class EquipementController {
     }
 
     /**
+     * GET /api/equipements/search
+     * Recherche d'équipements par IP
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchByIp(@RequestParam String ip) {
+        return equipementService.findByIp(ip)
+            .map(equipement -> {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("data", equipement);
+                return ResponseEntity.ok(response);
+            })
+            .orElseGet(() -> {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Aucun équipement trouvé avec l'IP: " + ip);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            });
+    }
+
+    /**
      * POST /api/equipements
      * Crée un nouvel équipement
+     * La validation métier est gérée par le Service
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> createEquipement(@Valid @RequestBody Equipement equipement) {
-        // Vérifier si l'IP existe déjà
-        if (equipementRepository.existsByAdresseIp(equipement.getAdresseIp())) {
+        try {
+            Equipement savedEquipement = equipementService.createEquipement(equipement);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Équipement créé avec succès");
+            response.put("data", savedEquipement);
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
-            response.put("message", "Un équipement avec cette adresse IP existe déjà");
+            response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
-        
-        Equipement savedEquipement = equipementRepository.save(equipement);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Équipement créé avec succès");
-        response.put("data", savedEquipement);
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -176,33 +178,21 @@ public class EquipementController {
             @PathVariable Integer id,
             @Valid @RequestBody Equipement equipementDetails) {
         
-        return equipementRepository.findById(id)
-            .map(equipement -> {
-                // Mise à jour des champs
-                equipement.setNom(equipementDetails.getNom());
-                equipement.setType(equipementDetails.getType());
-                equipement.setAdresseIp(equipementDetails.getAdresseIp());
-                equipement.setAdresseMac(equipementDetails.getAdresseMac());
-                equipement.setFabricant(equipementDetails.getFabricant());
-                equipement.setModele(equipementDetails.getModele());
-                equipement.setEtat(equipementDetails.getEtat());
-                equipement.setSalle(equipementDetails.getSalle());
-                
-                Equipement updatedEquipement = equipementRepository.save(equipement);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "Équipement mis à jour avec succès");
-                response.put("data", updatedEquipement);
-                
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Équipement non trouvé avec l'ID: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
+        try {
+            Equipement updatedEquipement = equipementService.updateEquipement(id, equipementDetails);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Équipement mis à jour avec succès");
+            response.put("data", updatedEquipement);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
     }
 
     /**
@@ -216,68 +206,48 @@ public class EquipementController {
         
         String nouvelEtat = body.get("etat");
         
-        return equipementRepository.findById(id)
-            .map(equipement -> {
-                equipement.setEtat(nouvelEtat);
-                Equipement updatedEquipement = equipementRepository.save(equipement);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "État mis à jour avec succès");
-                response.put("data", updatedEquipement);
-                
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Équipement non trouvé avec l'ID: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
+        try {
+            Equipement updatedEquipement = equipementService.changerEtat(id, nouvelEtat);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "État mis à jour avec succès");
+            response.put("data", updatedEquipement);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
     }
 
     /**
      * DELETE /api/equipements/{id}
      * Supprime un équipement
+     * La validation métier (alertes/tickets) est gérée par le Service
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteEquipement(@PathVariable Integer id) {
-        return equipementRepository.findById(id)
-            .map(equipement -> {
-                equipementRepository.delete(equipement);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "Équipement supprimé avec succès");
-                
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Équipement non trouvé avec l'ID: " + id);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
-    }
-
-    /**
-     * GET /api/equipements/search
-     * Recherche d'équipements par IP
-     */
-    @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchByIp(@RequestParam String ip) {
-        return equipementRepository.findByAdresseIp(ip)
-            .map(equipement -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("data", equipement);
-                return ResponseEntity.ok(response);
-            })
-            .orElseGet(() -> {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Aucun équipement trouvé avec l'IP: " + ip);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            });
+        try {
+            equipementService.deleteEquipement(id);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Équipement supprimé avec succès");
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (IllegalStateException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
     }
 }
