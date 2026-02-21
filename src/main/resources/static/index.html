@@ -907,30 +907,36 @@ function App() {
   const [loading, setLoading]         = useState(true);
   const [apiOnline, setApiOnline]     = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const [eq, al, ti] = await Promise.all([
-        apiFetch("/equipements"),
-        apiFetch("/alertes"),
-        apiFetch("/tickets"),
-      ]);
+  const POLL_INTERVAL = 15000; // 15 secondes
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-      if (eq.success && eq.data?.length > 0) {
-        setApiOnline(true);
-        setEquipements(eq.data);
-        setAlertes(al.success ? (al.data || []) : []);
-        setTickets(ti.success ? (ti.data || []) : []);
-      } else {
-        // Mode démo si backend non joignable
-        setApiOnline(false);
-        setEquipements(DEMO_EQUIPEMENTS);
-        setAlertes(DEMO_ALERTES);
-        setTickets(DEMO_TICKETS);
-      }
-      setLoading(false);
+  async function fetchData(isInitial = false) {
+    if (isInitial) setLoading(true); else setRefreshing(true);
+    const [eq, al, ti] = await Promise.all([
+      apiFetch("/equipements"),
+      apiFetch("/alertes"),
+      apiFetch("/tickets"),
+    ]);
+    if (eq.success && eq.data?.length > 0) {
+      setApiOnline(true);
+      setEquipements(eq.data);
+      setAlertes(al.success ? (al.data || []) : []);
+      setTickets(ti.success ? (ti.data || []) : []);
+    } else if (isInitial) {
+      setApiOnline(false);
+      setEquipements(DEMO_EQUIPEMENTS);
+      setAlertes(DEMO_ALERTES);
+      setTickets(DEMO_TICKETS);
     }
-    load();
+    setLastUpdate(new Date());
+    if (isInitial) setLoading(false); else setRefreshing(false);
+  }
+
+  useEffect(() => {
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), POLL_INTERVAL);
+    return () => clearInterval(interval);
   }, []);
 
   const nav = [
@@ -973,7 +979,14 @@ function App() {
               ⚠ Backend non joignable — données de démonstration
             </span>
           )}
-          <button className="topbar-btn" onClick={()=>window.location.reload()}>↻ Rafraîchir</button>
+          {lastUpdate && (
+            <span style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--mono)"}}>
+              {refreshing ? "⟳ Mise à jour…" : `↻ ${lastUpdate.toLocaleTimeString("fr-FR")}`}
+            </span>
+          )}
+          <button className="topbar-btn" onClick={()=>fetchData(false)} disabled={refreshing}>
+            ↻ Rafraîchir
+          </button>
         </div>
 
         <div className="content">
