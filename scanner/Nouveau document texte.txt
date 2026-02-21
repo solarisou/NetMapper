@@ -1,0 +1,7 @@
+faire un cmd dans le chemin du dossier scanner pour ouvrir un invité de commande.
+
+Effectuer : 
+pip install requests
+
+
+Faire un ipconfig/ifconfig pour voir son adresse ip local (ipv4)
