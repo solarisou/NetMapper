@@ -299,6 +299,108 @@ def save_json_report(devices: list, output_file: str = "scan_result.json"):
     log.info(f"Rapport JSON sauvegardé → {output_file}")
 
 
+# ─── Fonctions à ajouter au scanner ───────────────────────────────────────────
+
+def get_all_equipements() -> list:
+    """Récupère tous les équipements enregistrés en base via l'API."""
+    try:
+        r = requests.get(f"{API_BASE_URL}/equipements", timeout=5)
+        if r.status_code == 200:
+            return r.json().get("data", [])
+    except Exception as e:
+        log.warning(f"Impossible de récupérer les équipements : {e}")
+    return []
+
+
+def update_etat(id_equipement: int, nouvel_etat: str, nom: str) -> bool:
+    """Met à jour l'état d'un équipement via PATCH /api/equipements/{id}/etat."""
+    try:
+        r = requests.patch(
+            f"{API_BASE_URL}/equipements/{id_equipement}/etat",
+            json={"etat": nouvel_etat},
+            headers={"Content-Type": "application/json"},
+            timeout=5
+        )
+        if r.status_code == 200:
+            log.info(f"  [{nom}] → {nouvel_etat}")
+            return True
+        else:
+            log.warning(f"  [{nom}] Erreur PATCH ({r.status_code})")
+            return False
+    except Exception as e:
+        log.error(f"  [{nom}] Erreur API : {e}")
+        return False
+
+
+def monitor_cycle(cidr: str):
+    """
+    Un cycle de monitoring :
+    1. Récupère tous les équipements en base
+    2. Ping chacun
+    3. Met à jour l'état si changement détecté
+    4. Ajoute les nouveaux équipements découverts
+    """
+    log.info(f"=== Cycle monitoring — {datetime.now().strftime('%H:%M:%S')} ===")
+
+    # Récupérer les équipements connus en base
+    equipements_base = get_all_equipements()
+    ips_connues = {eq["adresseIp"]: eq for eq in equipements_base}
+
+    actifs = inactifs = inchanges = nouveaux = 0
+
+    # 1. Vérifier l'état de chaque équipement connu
+    for ip, eq in ips_connues.items():
+        repond = ping(ip)
+        etat_actuel = eq.get("etat", "Inactif")
+        nom = eq.get("nom", ip)
+        id_eq = eq.get("idEquipement")
+
+        if repond and etat_actuel != "Actif":
+            update_etat(id_eq, "Actif", nom)
+            actifs += 1
+        elif not repond and etat_actuel == "Actif":
+            update_etat(id_eq, "Inactif", nom)
+            inactifs += 1
+        else:
+            inchanges += 1
+
+    # 2. Scanner le réseau pour détecter les nouveaux équipements
+    arp_table = get_arp_table()
+    network = ipaddress.ip_network(cidr, strict=False)
+    hosts = list(network.hosts())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(scan_ip, str(h), arp_table): h for h in hosts}
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result and result["ip"] not in ips_connues:
+                log.info(f"  Nouveau : {result['ip']} ({result['type']})")
+                push_equipement(result)
+                nouveaux += 1
+
+    log.info(f"  Résultat : {actifs} passés Actif · {inactifs} passés Inactif · {inchanges} inchangés · {nouveaux} nouveaux")
+
+
+def run_monitor(cidr: str, interval: int = 60):
+    """
+    Boucle de monitoring infinie.
+    Re-scanne toutes les `interval` secondes.
+    Arrêt avec Ctrl+C.
+    """
+    print(f"\n{'='*60}")
+    print(f"  NetMapper Monitor — SMS Informatique")
+    print(f"  Réseau : {cidr}  |  Intervalle : {interval}s")
+    print(f"  Appuie sur Ctrl+C pour arrêter")
+    print(f"{'='*60}\n")
+
+    try:
+        while True:
+            monitor_cycle(cidr)
+            log.info(f"Prochain scan dans {interval}s…")
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\nMonitoring arrêté.")
+
 # ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 def main():
@@ -330,6 +432,17 @@ def main():
         default=None,
         help="Ports à scanner (ex: --ports 22 80 443)"
     )
+    parser.add_argument(
+        "--monitor",
+        action="store_true",
+        help="Mode monitoring continu : re-scanne et met à jour les états en temps réel"
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=60,
+        help="Intervalle en secondes entre chaque scan en mode monitoring (défaut: 60)"
+    )
     args = parser.parse_args()
 
     # Override des ports si précisés
@@ -337,6 +450,12 @@ def main():
     if args.ports:
         COMMON_PORTS = args.ports
 
+    # ── Mode monitoring continu ──
+    if args.monitor:
+        run_monitor(args.network, interval=args.interval)
+        return
+
+    # ── Mode scan unique ──
     print(f"\n{'='*60}")
     print(f"  NetMapper Scanner — SMS Informatique")
     print(f"  Réseau cible : {args.network}")
