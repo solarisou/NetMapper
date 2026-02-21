@@ -13,6 +13,6 @@ public class HelloController {
     
     @GetMapping("/")
     public String home() {
-        return "NetMapper API is running!";
+        return "NetMapper API is running! Frontend: http://localhost:8081/api/index.html";
     }
 }

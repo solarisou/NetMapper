@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NetMapper — SMS Informatique</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0a0e1a;
+    --surface:  #111827;
+    --border:   #1e2d45;
+    --blue:     #3b82f6;
+    --blue-dim: #1d4ed8;
+    --orange:   #f97316;
+    --green:    #22c55e;
+    --red:      #ef4444;
+    --yellow:   #eab308;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  html, body, #root { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .app { display: flex; height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .sidebar-logo {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-title {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .logo-title span { color: var(--orange); }
+  .logo-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-top: 3px;
+    letter-spacing: 1px;
+  }
+
+  .sidebar-nav { flex: 1; padding: 10px 8px; }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    transition: all .15s;
+    margin-bottom: 2px;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--border); color: var(--text); }
+  .nav-item.active { background: rgba(59,130,246,.18); color: var(--blue); }
+  .nav-item .icon { font-size: 16px; }
+
+  .sidebar-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .status-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .topbar-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    flex: 1;
+  }
+  .topbar-btn {
+    padding: 6px 14px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .topbar-btn:hover { background: var(--border); }
+  .topbar-btn.primary { background: var(--blue); border-color: var(--blue); }
+  .topbar-btn.primary:hover { background: var(--blue-dim); }
+
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* ── Cards ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.blue::before  { background: var(--blue); }
+  .stat-card.green::before { background: var(--green); }
+  .stat-card.red::before   { background: var(--red); }
+  .stat-card.orange::before{ background: var(--orange); }
+  .stat-label { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+  .stat-value { font-size: 32px; font-weight: 800; margin: 6px 0 2px; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── Table ── */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+  .section-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title { font-size: 13px; font-weight: 700; flex: 1; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    padding: 10px 18px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.02);
+    font-family: var(--mono);
+  }
+  td {
+    padding: 11px 18px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(30,45,69,.6);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(59,130,246,.04); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--mono);
+  }
+  .badge-green  { background: rgba(34,197,94,.15);  color: var(--green); }
+  .badge-red    { background: rgba(239,68,68,.15);   color: var(--red); }
+  .badge-yellow { background: rgba(234,179,8,.15);   color: var(--yellow); }
+  .badge-blue   { background: rgba(59,130,246,.15);  color: var(--blue); }
+  .badge-gray   { background: rgba(100,116,139,.15); color: var(--muted); }
+  .badge-orange { background: rgba(249,115,22,.15);  color: var(--orange); }
+
+  /* ── Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
+  input, select, textarea {
+    padding: 9px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue); }
+  select option { background: var(--surface); }
+  textarea { resize: vertical; min-height: 70px; }
+  .form-actions { padding: 0 18px 18px; display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ── Map ── */
+  .map-container {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    height: 500px;
+  }
+  .map-svg { width: 100%; height: 100%; }
+  .map-legend {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    background: rgba(17,24,39,.9);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(3px);
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp .2s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .modal-header {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    font-size: 14px; font-weight: 700;
+  }
+  .modal-header span { flex: 1; }
+  .modal-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 18px; cursor: pointer; padding: 0 4px;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 50px; color: var(--muted); font-size: 13px; }
+  .empty .icon { font-size: 32px; margin-bottom: 10px; }
+
+  /* ── Loading ── */
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .mono { font-family: var(--mono); }
+  .text-muted { color: var(--muted); }
+  .flex { display: flex; align-items: center; gap: 8px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ─── Config API ───────────────────────────────────────────────────────────────
+const API = "http://localhost:8081/api";
+
+async function apiFetch(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, {
+      headers: { "Content-Type": "application/json" },
+      ...opts
+    });
+    return await r.json();
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ─── Données de démo (si API indisponible) ────────────────────────────────────
+const DEMO_EQUIPEMENTS = [
+  { idEquipement: 1, nom: "Core-Switch-01", type: "Switch", adresseIp: "192.168.1.1", adresseMac: "AA:BB:CC:DD:EE:01", etat: "Actif", fabricant: "Cisco" },
+  { idEquipement: 2, nom: "Routeur-DMZ",    type: "Routeur", adresseIp: "192.168.1.254", adresseMac: "AA:BB:CC:DD:EE:02", etat: "Actif", fabricant: "Cisco" },
+  { idEquipement: 3, nom: "Srv-Web-01",     type: "Serveur", adresseIp: "192.168.1.10", adresseMac: "AA:BB:CC:DD:EE:03", etat: "Actif", fabricant: "Dell" },
+  { idEquipement: 4, nom: "Srv-DB-01",      type: "Serveur Base de Données", adresseIp: "192.168.1.11", adresseMac: "AA:BB:CC:DD:EE:04", etat: "Actif", fabricant: "HP" },
+  { idEquipement: 5, nom: "AP-Salle-B",     type: "Borne Wi-Fi", adresseIp: "192.168.1.50", adresseMac: "AA:BB:CC:DD:EE:05", etat: "Inactif", fabricant: "Ubiquiti" },
+  { idEquipement: 6, nom: "PC-Technicien",  type: "Poste de travail", adresseIp: "192.168.1.100", adresseMac: "AA:BB:CC:DD:EE:06", etat: "En maintenance", fabricant: "Lenovo" },
+];
+const DEMO_ALERTES = [
+  { idAlerte: 1, type: "Perte de connexion", niveau: "Critique", message: "AP-Salle-B ne répond plus aux pings ICMP", dateAlerte: "2026-02-21T08:32:00", equipement: { nom: "AP-Salle-B" } },
+  { idAlerte: 2, type: "CPU élevé", niveau: "Avertissement", message: "Srv-Web-01 : charge CPU > 90% depuis 10 min", dateAlerte: "2026-02-21T09:15:00", equipement: { nom: "Srv-Web-01" } },
+  { idAlerte: 3, type: "Port scan détecté", niveau: "Erreur", message: "Tentative de scan depuis 10.0.0.45", dateAlerte: "2026-02-21T07:00:00", equipement: { nom: "Core-Switch-01" } },
+  { idAlerte: 4, type: "Mise à jour", niveau: "Info", message: "Firmware Cisco v15.2 disponible", dateAlerte: "2026-02-20T14:00:00", equipement: { nom: "Core-Switch-01" } },
+];
+const DEMO_TICKETS = [
+  { idTicket: 1, gravite: "Critique", statut: "En cours", description: "AP-Salle-B hors service — étudier remplacement", dateOuverture: "2026-02-21T08:35:00", equipement: { nom: "AP-Salle-B" } },
+  { idTicket: 2, gravite: "Haute",    statut: "Ouvert",   description: "Optimiser les performances du serveur web", dateOuverture: "2026-02-21T09:20:00", equipement: { nom: "Srv-Web-01" } },
+  { idTicket: 3, gravite: "Moyenne",  statut: "Résolu",   description: "Mise à jour firmware switch planifiée", dateOuverture: "2026-02-18T11:00:00", equipement: { nom: "Core-Switch-01" } },
+  { idTicket: 4, gravite: "Faible",   statut: "Fermé",    description: "Reconfiguration VLAN salle B", dateOuverture: "2026-02-10T10:00:00", equipement: { nom: "Core-Switch-01" } },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function niveauBadge(n) {
+  if (!n) return <span className="badge badge-gray">—</span>;
+  const map = { Critique:"red", Avertissement:"yellow", Erreur:"orange", Info:"blue" };
+  return <span className={`badge badge-${map[n]||"gray"}`}>{n}</span>;
+}
+function statutBadge(s) {
+  const map = { Actif:"green", Inactif:"red", "En maintenance":"yellow", "Hors service":"gray",
+                Ouvert:"blue", "En cours":"yellow", Résolu:"green", Fermé:"gray", Annulé:"gray" };
+  return <span className={`badge badge-${map[s]||"gray"}`}>{s}</span>;
+}
+function graviteBadge(g) {
+  const map = { Critique:"red", Haute:"orange", Moyenne:"yellow", Faible:"green" };
+  return <span className={`badge badge-${map[g]||"gray"}`}>{g}</span>;
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+function Dashboard({ equipements, alertes, tickets }) {
+  const actifs     = equipements.filter(e => e.etat === "Actif").length;
+  const inactifs   = equipements.filter(e => e.etat === "Inactif").length;
+  const critiques  = alertes.filter(a => a.niveau === "Critique").length;
+  const ouvert     = tickets.filter(t => t.statut === "Ouvert" || t.statut === "En cours").length;
+
+  return (
+    <div>
+      <div className="stat-grid">
+        <div className="stat-card blue">
+          <div className="stat-label">Équipements</div>
+          <div className="stat-value">{equipements.length}</div>
+          <div className="stat-sub">{actifs} actifs · {inactifs} inactifs</div>
+        </div>
+        <div className="stat-card green">
+          <div className="stat-label">En ligne</div>
+          <div className="stat-value">{actifs}</div>
+          <div className="stat-sub">{equipements.length > 0 ? Math.round(actifs/equipements.length*100) : 0}% disponibilité</div>
+        </div>
+        <div className="stat-card red">
+          <div className="stat-label">Alertes critiques</div>
+          <div className="stat-value">{critiques}</div>
+          <div className="stat-sub">{alertes.length} alertes totales</div>
+        </div>
+        <div className="stat-card orange">
+          <div className="stat-label">Tickets ouverts</div>
+          <div className="stat-value">{ouvert}</div>
+          <div className="stat-sub">{tickets.length} tickets totaux</div>
+        </div>
+      </div>
+
+      <div className="two-col">
+        <div className="section">
+          <div className="section-header">
+            <span className="section-title">⚠ Alertes récentes</span>
+          </div>
+          <table>
+            <thead><tr><th>Niveau</th><th>Équipement</th><th>Message</th></tr></thead>
+            <tbody>
+              {alertes.slice(0,5).map(a => (
+                <tr key={a.idAlerte}>
+                  <td>{niveauBadge(a.niveau)}</td>
+                  <td className="mono" style={{fontSize:11}}>{a.equipement?.nom || "—"}</td>
+                  <td style={{color:"var(--muted)",fontSize:12}}>{a.message?.slice(0,45)}…</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="section">
+          <div className="section-header">
+            <span className="section-title">🎫 Tickets récents</span>
+          </div>
+          <table>
+            <thead><tr><th>Gravité</th><th>Statut</th><th>Description</th></tr></thead>
+            <tbody>
+              {tickets.slice(0,5).map(t => (
+                <tr key={t.idTicket}>
+                  <td>{graviteBadge(t.gravite)}</td>
+                  <td>{statutBadge(t.statut)}</td>
+                  <td style={{color:"var(--muted)",fontSize:12}}>{t.description?.slice(0,40)}…</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="section">
+        <div className="section-header">
+          <span className="section-title">🖥 État du parc équipements</span>
+        </div>
+        <table>
+          <thead><tr><th>Nom</th><th>Type</th><th>IP</th><th>État</th><th>Fabricant</th></tr></thead>
+          <tbody>
+            {equipements.map(e => (
+              <tr key={e.idEquipement}>
+                <td className="mono" style={{fontSize:12}}>{e.nom}</td>
+                <td style={{color:"var(--muted)",fontSize:12}}>{e.type}</td>
+                <td className="mono" style={{fontSize:11,color:"var(--blue)"}}>{e.adresseIp}</td>
+                <td>{statutBadge(e.etat)}</td>
+                <td style={{fontSize:12,color:"var(--muted)"}}>{e.fabricant||"—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Cartographie réseau ──────────────────────────────────────────────────────
+function Cartographie({ equipements }) {
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const svgRef = useRef();
+  const [drag, setDrag] = useState(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (!equipements.length) return;
+    const cx = 650, cy = 250, r = 180;
+    const mapped = equipements.map((eq, i) => {
+      let x, y;
+      if (eq.type === "Switch" || eq.type === "Routeur") {
+        // centre
+        x = cx + (i < 2 ? (i === 0 ? -60 : 60) : 0);
+        y = cy + (i < 2 ? 0 : -60);
+      } else {
+        const angle = (i / equipements.length) * 2 * Math.PI - Math.PI / 2;
+        x = cx + r * Math.cos(angle);
+        y = cy + r * Math.sin(angle);
+      }
+      return { ...eq, x: Math.round(x), y: Math.round(y), id: eq.idEquipement };
+    });
+
+    // Connexions heuristiques : tout vers le premier switch/routeur
+    const hub = mapped.find(n => n.type === "Switch" || n.type === "Routeur");
+    const edgeList = [];
+    if (hub) {
+      mapped.forEach(n => {
+        if (n.id !== hub.id) edgeList.push({ from: hub.id, to: n.id });
+      });
+    }
+    setNodes(mapped);
+    setEdges(edgeList);
+  }, [equipements]);
+
+  const typeColor = {
+    "Switch": "#3b82f6", "Routeur": "#f97316",
+    "Serveur": "#22c55e", "Serveur Base de Données": "#a855f7",
+    "Serveur Web": "#06b6d4", "Poste de travail": "#64748b",
+    "Borne Wi-Fi": "#eab308", "Imprimante": "#94a3b8",
+  };
+
+  const typeIcon = {
+    "Switch": "🔀", "Routeur": "🌐", "Serveur": "🖥",
+    "Serveur Base de Données": "🗄", "Serveur Web": "🌍",
+    "Poste de travail": "💻", "Borne Wi-Fi": "📡", "Imprimante": "🖨",
+  };
+
+  function onMouseDown(e, id) {
+    e.preventDefault();
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const node = nodes.find(n => n.id === id);
+    setDrag(id);
+    setOffset({ x: e.clientX - svgRect.left - node.x, y: e.clientY - svgRect.top - node.y });
+  }
+
+  function onMouseMove(e) {
+    if (!drag) return;
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const x = e.clientX - svgRect.left - offset.x;
+    const y = e.clientY - svgRect.top - offset.y;
+    setNodes(prev => prev.map(n => n.id === drag ? { ...n, x, y } : n));
+  }
+
+  function onMouseUp() { setDrag(null); }
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const sel = selected ? nodes.find(n => n.id === selected) : null;
+
+  return (
+    <div>
+      <div className="map-container" onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+        <svg ref={svgRef} className="map-svg">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="var(--border)" />
+            </marker>
+          </defs>
+          {/* Edges */}
+          {edges.map((e, i) => {
+            const s = nodeMap[e.from], d = nodeMap[e.to];
+            if (!s || !d) return null;
+            return (
+              <line key={i} x1={s.x} y1={s.y} x2={d.x} y2={d.y}
+                stroke="var(--border)" strokeWidth="1.5"
+                markerEnd="url(#arrow)" strokeDasharray={d.etat === "Inactif" ? "5,4" : "none"}
+                opacity={d.etat === "Inactif" ? 0.3 : 0.6}
+              />
+            );
+          })}
+          {/* Nodes */}
+          {nodes.map(n => {
+            const color  = typeColor[n.type] || "#64748b";
+            const icon   = typeIcon[n.type] || "📦";
+            const isDown = n.etat !== "Actif";
+            const isSel  = selected === n.id;
+            return (
+              <g key={n.id} transform={`translate(${n.x},${n.y})`}
+                 style={{ cursor: drag === n.id ? "grabbing" : "grab" }}
+                 onMouseDown={e => onMouseDown(e, n.id)}
+                 onClick={() => setSelected(selected === n.id ? null : n.id)}>
+                {isSel && <circle r="28" fill="none" stroke={color} strokeWidth="2" opacity="0.4" />}
+                <circle r="22" fill={isDown ? "rgba(17,24,39,.9)" : `${color}22`}
+                  stroke={color} strokeWidth={isSel ? 2.5 : 1.5}
+                  opacity={isDown ? 0.5 : 1}
+                />
+                <text x="0" y="7" textAnchor="middle" fontSize="14">{icon}</text>
+                <text x="0" y="36" textAnchor="middle" fontSize="10" fill={isDown ? "var(--muted)" : "var(--text)"}
+                  fontFamily="var(--mono)">{n.nom?.slice(0,14)}</text>
+                <text x="0" y="48" textAnchor="middle" fontSize="9" fill="var(--muted)">{n.adresseIp}</text>
+                {isDown && (
+                  <circle cx="16" cy="-16" r="6" fill="var(--red)" />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Légende */}
+        <div className="map-legend">
+          <div style={{fontSize:10,fontWeight:700,color:"var(--muted)",marginBottom:4,letterSpacing:.5,fontFamily:"var(--mono)"}}>LÉGENDE</div>
+          {Object.entries(typeColor).slice(0,5).map(([t, c]) => (
+            <div key={t} className="legend-item">
+              <div className="legend-dot" style={{background:c}} />
+              <span style={{fontSize:10}}>{typeIcon[t]} {t}</span>
+            </div>
+          ))}
+          <div className="legend-item" style={{marginTop:4,borderTop:"1px solid var(--border)",paddingTop:4}}>
+            <div style={{width:20,height:2,background:"var(--border)",opacity:.4}} />
+            <span style={{fontSize:10,color:"var(--muted)"}}>Hors ligne</span>
+          </div>
+        </div>
+
+        {/* Panel détail */}
+        {sel && (
+          <div style={{
+            position:"absolute",top:14,right:14,
+            background:"rgba(17,24,39,.95)",border:"1px solid var(--border)",
+            borderRadius:8,padding:"14px 16px",width:220,
+            backdropFilter:"blur(8px)"
+          }}>
+            <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>{sel.nom}</div>
+            {[["Type",sel.type],["IP",sel.adresseIp],["MAC",sel.adresseMac||"—"],["Fabricant",sel.fabricant||"—"],["État",sel.etat]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:5,fontSize:11}}>
+                <span style={{color:"var(--muted)"}}>{k}</span>
+                <span style={{fontFamily:"var(--mono)",fontSize:11}}>{v}</span>
+              </div>
+            ))}
+            <button className="topbar-btn" style={{width:"100%",marginTop:8,textAlign:"center"}}
+              onClick={()=>setSelected(null)}>Fermer</button>
+          </div>
+        )}
+      </div>
+      <div style={{padding:"10px 0",color:"var(--muted)",fontSize:11,fontFamily:"var(--mono)"}}>
+        💡 Glissez les nœuds pour réorganiser · Cliquez pour voir les détails · Pointillés = équipement hors ligne
+      </div>
+    </div>
+  );
+}
+
+// ─── Équipements ──────────────────────────────────────────────────────────────
+function Equipements({ equipements, setEquipements }) {
+  const [modal, setModal]   = useState(false);
+  const [form, setForm]     = useState({
+    nom:"", type:"Serveur", adresseIp:"", adresseMac:"", fabricant:"", modele:"", etat:"Actif"
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    const r = await apiFetch("/equipements", { method:"POST", body: JSON.stringify(form) });
+    setSaving(false);
+    if (r.success) {
+      setEquipements(prev => [...prev, r.data]);
+      setModal(false);
+      setForm({ nom:"", type:"Serveur", adresseIp:"", adresseMac:"", fabricant:"", modele:"", etat:"Actif" });
+    } else {
+      alert("Erreur : " + (r.message || "Ajout impossible"));
+    }
+  }
+
+  async function toggleEtat(eq) {
+    const newEtat = eq.etat === "Actif" ? "Inactif" : "Actif";
+    const r = await apiFetch(`/equipements/${eq.idEquipement}/etat`, {
+      method: "PATCH", body: JSON.stringify({ etat: newEtat })
+    });
+    if (r.success) {
+      setEquipements(prev => prev.map(e => e.idEquipement === eq.idEquipement ? { ...e, etat: newEtat } : e));
+    }
+  }
+
+  return (
+    <div>
+      <div className="section">
+        <div className="section-header">
+          <span className="section-title">🖥 Équipements réseau ({equipements.length})</span>
+          <button className="topbar-btn primary" onClick={()=>setModal(true)}>+ Ajouter</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Nom</th><th>Type</th><th>Adresse IP</th><th>MAC</th><th>Fabricant</th><th>État</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {equipements.map(eq => (
+              <tr key={eq.idEquipement}>
+                <td style={{fontWeight:600}}>{eq.nom}</td>
+                <td style={{color:"var(--muted)",fontSize:12}}>{eq.type}</td>
+                <td className="mono" style={{color:"var(--blue)",fontSize:12}}>{eq.adresseIp}</td>
+                <td className="mono" style={{fontSize:11,color:"var(--muted)"}}>{eq.adresseMac||"—"}</td>
+                <td style={{fontSize:12,color:"var(--muted)"}}>{eq.fabricant||"—"}</td>
+                <td>{statutBadge(eq.etat)}</td>
+                <td>
+                  <button className="topbar-btn" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>toggleEtat(eq)}>
+                    {eq.etat === "Actif" ? "Désactiver" : "Activer"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span>Nouvel équipement</span>
+              <button className="modal-close" onClick={()=>setModal(false)}>✕</button>
+            </div>
+            <form onSubmit={submit}>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Nom *</label>
+                  <input name="nom" value={form.nom} onChange={handleChange} required placeholder="Core-Switch-01" />
+                </div>
+                <div className="form-group">
+                  <label>Type *</label>
+                  <select name="type" value={form.type} onChange={handleChange}>
+                    {["Serveur","Routeur","Switch","Borne Wi-Fi","Imprimante","Poste de travail","Firewall","Autre"].map(t=>(
+                      <option key={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Adresse IP *</label>
+                  <input name="adresseIp" value={form.adresseIp} onChange={handleChange} required placeholder="192.168.1.1"
+                    pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" />
+                </div>
+                <div className="form-group">
+                  <label>Adresse MAC</label>
+                  <input name="adresseMac" value={form.adresseMac} onChange={handleChange} placeholder="AA:BB:CC:DD:EE:FF"
+                    pattern="^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$" />
+                </div>
+                <div className="form-group">
+                  <label>Fabricant</label>
+                  <input name="fabricant" value={form.fabricant} onChange={handleChange} placeholder="Cisco" />
+                </div>
+                <div className="form-group">
+                  <label>Modèle</label>
+                  <input name="modele" value={form.modele} onChange={handleChange} placeholder="Catalyst 2960" />
+                </div>
+                <div className="form-group">
+                  <label>État initial</label>
+                  <select name="etat" value={form.etat} onChange={handleChange}>
+                    {["Actif","Inactif","En maintenance","Hors service"].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-actions">
+                <button type="button" className="topbar-btn" onClick={()=>setModal(false)}>Annuler</button>
+                <button type="submit" className="topbar-btn primary" disabled={saving}>
+                  {saving ? "Enregistrement…" : "Ajouter"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Alertes ──────────────────────────────────────────────────────────────────
+function Alertes({ alertes }) {
+  return (
+    <div className="section">
+      <div className="section-header">
+        <span className="section-title">⚠ Alertes ({alertes.length})</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Niveau</th><th>Type</th><th>Équipement</th><th>Message</th><th>Date</th></tr>
+        </thead>
+        <tbody>
+          {alertes.length === 0 ? (
+            <tr><td colSpan={5}><div className="empty"><div className="icon">✅</div>Aucune alerte active</div></td></tr>
+          ) : alertes.map(a => (
+            <tr key={a.idAlerte}>
+              <td>{niveauBadge(a.niveau)}</td>
+              <td style={{fontWeight:600,fontSize:12}}>{a.type}</td>
+              <td className="mono" style={{fontSize:11,color:"var(--blue)"}}>{a.equipement?.nom || a.idEquipement || "—"}</td>
+              <td style={{color:"var(--muted)",fontSize:12,maxWidth:300}}>{a.message}</td>
+              <td className="mono" style={{fontSize:11,color:"var(--muted)"}}>{fmtDate(a.dateAlerte)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Tickets ──────────────────────────────────────────────────────────────────
+function Tickets({ tickets, setTickets, equipements }) {
+  const [modal, setModal] = useState(false);
+  const [form, setForm]   = useState({ gravite:"Moyenne", statut:"Ouvert", description:"", idEquipement:"" });
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    const payload = { ...form, idEquipement: form.idEquipement ? parseInt(form.idEquipement) : null };
+    const r = await apiFetch("/tickets", { method:"POST", body: JSON.stringify(payload) });
+    setSaving(false);
+    if (r.success) {
+      setTickets(prev => [r.data, ...prev]);
+      setModal(false);
+      setForm({ gravite:"Moyenne", statut:"Ouvert", description:"", idEquipement:"" });
+    } else {
+      alert("Erreur : " + (r.message || "Création impossible"));
+    }
+  }
+
+  async function changeStatut(ticket, newStatut) {
+    const r = await apiFetch(`/tickets/${ticket.idTicket}/statut`, {
+      method:"PATCH", body: JSON.stringify({ statut: newStatut })
+    });
+    if (r.success) {
+      setTickets(prev => prev.map(t => t.idTicket === ticket.idTicket ? { ...t, statut: newStatut } : t));
+    }
+  }
+
+  return (
+    <div>
+      <div className="section">
+        <div className="section-header">
+          <span className="section-title">🎫 Tickets ({tickets.length})</span>
+          <button className="topbar-btn primary" onClick={()=>setModal(true)}>+ Créer</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>#</th><th>Gravité</th><th>Statut</th><th>Équipement</th><th>Description</th><th>Ouvert le</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {tickets.length === 0 ? (
+              <tr><td colSpan={7}><div className="empty"><div className="icon">🎉</div>Aucun ticket ouvert</div></td></tr>
+            ) : tickets.map(t => (
+              <tr key={t.idTicket}>
+                <td className="mono" style={{color:"var(--muted)",fontSize:11}}>#{t.idTicket}</td>
+                <td>{graviteBadge(t.gravite)}</td>
+                <td>{statutBadge(t.statut)}</td>
+                <td className="mono" style={{fontSize:11,color:"var(--blue)"}}>{t.equipement?.nom || "—"}</td>
+                <td style={{fontSize:12,maxWidth:250,color:"var(--muted)"}}>{t.description}</td>
+                <td className="mono" style={{fontSize:11,color:"var(--muted)"}}>{fmtDate(t.dateOuverture)}</td>
+                <td>
+                  {t.statut !== "Résolu" && t.statut !== "Fermé" && (
+                    <button className="topbar-btn" style={{fontSize:11,padding:"4px 10px"}}
+                      onClick={()=>changeStatut(t, t.statut === "Ouvert" ? "En cours" : "Résolu")}>
+                      {t.statut === "Ouvert" ? "Prendre en charge" : "Résoudre"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span>Nouveau ticket</span>
+              <button className="modal-close" onClick={()=>setModal(false)}>✕</button>
+            </div>
+            <form onSubmit={submit}>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Gravité *</label>
+                  <select name="gravite" value={form.gravite} onChange={handleChange}>
+                    {["Faible","Moyenne","Haute","Critique"].map(g=><option key={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Équipement concerné</label>
+                  <select name="idEquipement" value={form.idEquipement} onChange={handleChange}>
+                    <option value="">— Aucun —</option>
+                    {equipements.map(eq => <option key={eq.idEquipement} value={eq.idEquipement}>{eq.nom}</option>)}
+                  </select>
+                </div>
+                <div className="form-group full">
+                  <label>Description *</label>
+                  <textarea name="description" value={form.description} onChange={handleChange} required
+                    placeholder="Décrivez le problème ou la tâche à effectuer…" />
+                </div>
+              </div>
+              <div className="form-actions">
+                <button type="button" className="topbar-btn" onClick={()=>setModal(false)}>Annuler</button>
+                <button type="submit" className="topbar-btn primary" disabled={saving}>
+                  {saving ? "Création…" : "Créer le ticket"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── App principale ───────────────────────────────────────────────────────────
+function App() {
+  const [page, setPage]               = useState("dashboard");
+  const [equipements, setEquipements] = useState([]);
+  const [alertes, setAlertes]         = useState([]);
+  const [tickets, setTickets]         = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [apiOnline, setApiOnline]     = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const [eq, al, ti] = await Promise.all([
+        apiFetch("/equipements"),
+        apiFetch("/alertes"),
+        apiFetch("/tickets"),
+      ]);
+
+      if (eq.success && eq.data?.length > 0) {
+        setApiOnline(true);
+        setEquipements(eq.data);
+        setAlertes(al.success ? (al.data || []) : []);
+        setTickets(ti.success ? (ti.data || []) : []);
+      } else {
+        // Mode démo si backend non joignable
+        setApiOnline(false);
+        setEquipements(DEMO_EQUIPEMENTS);
+        setAlertes(DEMO_ALERTES);
+        setTickets(DEMO_TICKETS);
+      }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const nav = [
+    { id:"dashboard",    label:"Tableau de bord", icon:"📊" },
+    { id:"cartographie", label:"Cartographie",     icon:"🗺" },
+    { id:"equipements",  label:"Équipements",      icon:"🖥" },
+    { id:"alertes",      label:"Alertes",          icon:"⚠" },
+    { id:"tickets",      label:"Tickets",          icon:"🎫" },
+  ];
+
+  const pageTitle = nav.find(n=>n.id===page)?.label || "";
+
+  return (
+    <div className="app">
+      <nav className="sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-title">Net<span>Mapper</span></div>
+          <div className="logo-sub">SMS INFORMATIQUE</div>
+        </div>
+        <div className="sidebar-nav">
+          {nav.map(n => (
+            <button key={n.id} className={`nav-item ${page===n.id?"active":""}`} onClick={()=>setPage(n.id)}>
+              <span className="icon">{n.icon}</span>{n.label}
+            </button>
+          ))}
+        </div>
+        <div className="sidebar-footer">
+          <span className="status-dot" style={{background: apiOnline ? "var(--green)" : "var(--yellow)"}} />
+          {apiOnline ? "API connectée" : "Mode démo"}
+          <br />
+          <span style={{marginLeft:13}}>:8081/api</span>
+        </div>
+      </nav>
+
+      <div className="main">
+        <div className="topbar">
+          <div className="topbar-title">{pageTitle}</div>
+          {!apiOnline && (
+            <span style={{fontSize:11,color:"var(--yellow)",fontFamily:"var(--mono)"}}>
+              ⚠ Backend non joignable — données de démonstration
+            </span>
+          )}
+          <button className="topbar-btn" onClick={()=>window.location.reload()}>↻ Rafraîchir</button>
+        </div>
+
+        <div className="content">
+          {loading ? (
+            <div className="loading">Connexion à l'API backend…</div>
+          ) : (
+            <>
+              {page === "dashboard"    && <Dashboard equipements={equipements} alertes={alertes} tickets={tickets} />}
+              {page === "cartographie" && <Cartographie equipements={equipements} />}
+              {page === "equipements"  && <Equipements equipements={equipements} setEquipements={setEquipements} />}
+              {page === "alertes"      && <Alertes alertes={alertes} />}
+              {page === "tickets"      && <Tickets tickets={tickets} setTickets={setTickets} equipements={equipements} />}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
