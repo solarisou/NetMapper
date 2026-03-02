@@ -26,8 +26,8 @@ public class NetMapperApplication {
         System.out.println("=".repeat(60));
         System.out.println("  NetMapper Backend API - SMS Informatique");
         System.out.println("  Version: 1.0");
-        System.out.println("  Port: 8081");
-        System.out.println("  API Base URL: http://localhost:8081/api");
+        System.out.println("  Port: 5000");
+        System.out.println("  API Base URL: http://localhost:5000/api");
         System.out.println("=".repeat(60));
         System.out.println("\n");
     }
