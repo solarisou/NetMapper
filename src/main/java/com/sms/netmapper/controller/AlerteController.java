@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sms.netmapper.model.Alerte;
 import com.sms.netmapper.service.AlerteService;
+import com.sms.netmapper.service.NotificationService;
 
 import jakarta.validation.Valid;
 
@@ -35,6 +36,8 @@ public class AlerteController {
 
     @Autowired
     private AlerteService alerteService;
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * GET /api/alertes
@@ -158,24 +161,35 @@ public class AlerteController {
      * Crée une nouvelle alerte
      * La validation métier est gérée par le Service
      */
-    @PostMapping
-    public ResponseEntity<Map<String, Object>> createAlerte(@Valid @RequestBody Alerte alerte) {
-        try {
-            Alerte savedAlerte = alerteService.createAlerte(alerte);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Alerte créée avec succès");
-            response.put("data", savedAlerte);
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+   @PostMapping
+public ResponseEntity<Map<String, Object>> createAlerte(@Valid @RequestBody Alerte alerte) {
+    try {
+        Alerte savedAlerte = alerteService.createAlerte(alerte);
+
+        // Notifier le frontend via WebSocket
+        if (savedAlerte.getEquipement() != null) {
+            notificationService.notifierNouvelleAlerte(
+                savedAlerte.getEquipement().getIdEquipement(),
+                savedAlerte.getEquipement().getNom(),
+                savedAlerte.getNiveau(),
+                savedAlerte.getMessage(),
+                savedAlerte.getType()
+            );
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Alerte créée avec succès");
+        response.put("data", savedAlerte);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    } catch (IllegalArgumentException e) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+}
 
     /**
      * PUT /api/alertes/{id}

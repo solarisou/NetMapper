@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sms.netmapper.model.Equipement;
 import com.sms.netmapper.service.EquipementService;
+import com.sms.netmapper.service.NotificationService;
 
 import jakarta.validation.Valid;
 
@@ -37,6 +38,8 @@ public class EquipementController {
 
     @Autowired
     private EquipementService equipementService;
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * GET /api/equipements
@@ -199,29 +202,42 @@ public class EquipementController {
      * PATCH /api/equipements/{id}/etat
      * Met à jour uniquement l'état d'un équipement
      */
-    @PatchMapping("/{id}/etat")
-    public ResponseEntity<Map<String, Object>> updateEtat(
-            @PathVariable Integer id,
-            @RequestBody Map<String, String> body) {
+   @PatchMapping("/{id}/etat")
+public ResponseEntity<Map<String, Object>> updateEtat(
+        @PathVariable Integer id,
+        @RequestBody Map<String, String> body) {
+    
+    String nouvelEtat = body.get("etat");
+    
+    try {
+        // Récupérer l'ancien état AVANT la mise à jour
+        String ancienEtat = equipementService.getEquipementById(id)
+                .map(Equipement::getEtat)
+                .orElse("Inconnu");
+
+        Equipement updatedEquipement = equipementService.changerEtat(id, nouvelEtat);
+
+        // Notifier le frontend via WebSocket
+        notificationService.notifierChangementEtat(
+                id,
+                updatedEquipement.getNom(),
+                ancienEtat,
+                nouvelEtat
+        );
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "État mis à jour avec succès");
+        response.put("data", updatedEquipement);
         
-        String nouvelEtat = body.get("etat");
-        
-        try {
-            Equipement updatedEquipement = equipementService.changerEtat(id, nouvelEtat);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "État mis à jour avec succès");
-            response.put("data", updatedEquipement);
-            
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+        return ResponseEntity.ok(response);
+    } catch (IllegalArgumentException e) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
+}
 
     /**
      * DELETE /api/equipements/{id}
