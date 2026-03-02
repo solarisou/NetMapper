@@ -23,14 +23,20 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll()  // ← Tout est accessible sans authentification
-            )
-            .csrf(csrf -> csrf.disable());  // ← Désactiver CSRF pour simplifier
-        
-        return http.build();
-    }
+   @Bean
+public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http
+        .authorizeHttpRequests(auth -> auth
+            .anyRequest().permitAll()
+        )
+        .csrf(csrf -> csrf
+            .ignoringRequestMatchers("/ws/**")  // ← Exclure WebSocket du CSRF
+            .disable()
+        )
+        .headers(headers -> headers
+            .frameOptions(frame -> frame.disable())  // ← Nécessaire pour SockJS
+        );
+
+    return http.build();
+}
 }
